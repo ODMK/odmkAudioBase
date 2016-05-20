@@ -27,6 +27,9 @@ import matplotlib.pyplot as plt
 
 from odmkClear import *
 
+import odmkClocks as clks
+import odmkSigGen1 as sigGen
+
 # temp python debugger - use >>>pdb.set_trace() to set break
 import pdb
 
