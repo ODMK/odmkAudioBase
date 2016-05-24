@@ -175,45 +175,63 @@ def odmkPVA(PVAin, Awin, NFFT, Ra, Fs):
         fs -> sampling frequency '''
 
     sigLength = len(PVAin)
+    print('\noriginal input signal length = '+str(sigLength))
+    # calculate zero-padded internal result buffer
+    if sigLength % Ra == 0:
+        sigZpLength = 0
+    else:
+        sigZpLength = Ra - (sigLength % Ra)    
+    for k in range(sigZpLength):
+        PVAin = np.append(PVAin, 0)
+
+    sigLength = len(PVAin)
+    print('Zero padded signal length = '+str(sigLength))        
+    numFrame = int((sigLength - (sigLength % Ra))/Ra)
+    print('Number of STFT output frames = '+str(numFrame)+'\n')
 
     # int posin, posout, i, k, mod;
     # float *sigframe, *specframe, *lastph;
     # float fac, scal, phi, mag, delta
 
-    sigframe = np.array(NFFT)
-    specframe = np.array(NFFT)
+    # input signal (real-only)
+    sigframe = np.zeros(NFFT)
+    # fft output spectrum (complex)
+    specframe = np.zeros(NFFT)
 
     lastph = np.zeros(NFFT/2)
+
+    specframe_mag = np.zeros(NFFT/2)
+    specframe_ph = np.zeros(NFFT/2)
 
     fac = Fs / (Ra * 2*np.pi)
     scal = 2*np.pi * Ra/NFFT
 
-    inIdx = 0
-    outIdx = 0
+    # PVAout = np.arange(2*NFFT/2*numFrame).reshape(2, NFFT/2, numFrame)
+    PVAout = np.zeros((2,numFrame,NFFT/2))
+    
+    frameIdx = 0
     # for(posin=posout=0; posin < input_size; posin+=hopsize):
     for j in range(0, sigLength, Ra):
-        mod = inIdx % NFFT
+        mod = j % NFFT
         # window & rotate a signal frame
         for i in range(NFFT):
-            if (inIdx+i < sigLength):
-                sigframe[(i + mod) % NFFT] = PVAin[inIdx + i] * Awin[i]
+            if (j+i < sigLength):
+                sigframe[(i + mod) % NFFT] = PVAin[j + i] * Awin[i]
             else:
                 sigframe[(i + mod) % NFFT] = 0
 
         # transform it
         specframe = sp.fft(sigframe)
-        # rectangular to polar
-        # specMag = np.abs(specframe)
-        # specPhase = np.arctan2(specframe.imag, specframe.real)
 
-        # convert to PV output
-        k = 1
-        h = 2
-        # for(h=2,k=1; h < fftsize; h+=2, k++){
-        for h in range(0, NFFT, 2):
+        # convert to PV output (rectangular to polar)
+        # specframe_mag[0] = dc (0 - phase)
+        specframe_mag[0] = np.abs(specframe[0].real)
+        # specframe_ph[0] = Nyquist (0 - phase)
+        specframe_ph[0] = np.abs(specframe[int(NFFT/2)].real)
+        for k in range(1, int(NFFT/2)):
 
-            mag = sp.sqrt(specframe[h]*specframe[h] + specframe[h+1]*specframe[h+1])
-            phi = np.atan2(specframe[h+1], specframe[h])
+            mag = sp.sqrt(specframe[k].real*specframe[k].real + specframe[k].imag*specframe[k].imag)
+            phi = np.arctan2(specframe[k].imag, specframe[k].real)
             # phase diffs
             delta = phi - lastph[k]
             lastph[k] = phi
@@ -225,18 +243,19 @@ def odmkPVA(PVAin, Awin, NFFT, Ra, Fs):
                 delta += 2 * np.pi
 
             # construct the amplitude-frequency pairs
-            specframe[h] = mag
-            specframe[h+1] = (delta + k * scal) * fac
+            specframe_mag[k] = mag
+            specframe_ph[k] = (delta + k * scal) * fac
 
-            k += 1
-
-        # output it
-        # for(i=0; i < fftsize; i++, posout++)
-        for g in range(NFFT):
-            output[outIdx] = specframe[g]
-            outIdx += 1
+        # pdb.set_trace()
+        PVAout[0, frameIdx, :] = specframe_mag
+        PVAout[1, frameIdx, :] = specframe_ph
+        # PVAout[0][frameIdx] = specframe_mag
+        # PVAout[1][frameIdx] = specframe_ph
+        frameIdx += 1
 
     return PVAout
+
+
 
 
 #int pvs(float* input, float* window, float* output,
@@ -621,7 +640,7 @@ sigLength = 4096
 
 NFFT = 64
 
-Ra = 32
+Ra = int(NFFT/4)
 
 PVAin = y2[0:sigLength]
 
@@ -668,6 +687,7 @@ pltYlabel = 'Magnitude (scaled by 2/N)'
 xfnyq = np.linspace(0.0, 1.0/(2.0*T), N/2)
 
 odmkPlot1D(fnum, y1_FFTscale, xfnyq, pltTitle, pltXlabel, pltYlabel)
+
 
 # // *---------------------------------------------------------------------* //
 # // *---plot a single sin out of array---*
@@ -765,6 +785,35 @@ pltYlabel = 'Magnitude (scaled by 2/N)'
 xfnyq = np.linspace(0.0, 1.0/(2.0*T), N/2)
 
 odmkMultiPlot1D(fnum, yOrthoScaleArray, xfnyq, pltTitle, pltXlabel, pltYlabel, colorMp='hsv')
+
+
+# // *---------------------------------------------------------------------* //
+# // *---STFT Magnitude plot (1 frame)---*
+# // *---------------------------------------------------------------------* //
+
+fnum = 100
+pltTitle = 'Scipy PV Mag: PVAout (1 frame) '+str(testFreq2)+' Hz'
+pltXlabel = 'Frequency: 0 - '+str(fs / 2)+' Hz'
+pltYlabel = 'Magnitude (scaled by 2/N)'
+
+# sig <= direct
+
+# define a linear space from 0 to 1/2 Fs for x-axis:
+xfnyq = np.linspace(0.0, 1.0/(2.0*T), NFFT/2)
+
+odmkPlot1D(fnum, PVAout[0][0], xfnyq, pltTitle, pltXlabel, pltYlabel)
+
+
+# // *---------------------------------------------------------------------* //
+# // *---STFT Spectrogram Plot??---*
+# // *---------------------------------------------------------------------* //
+
+result = PVAout[0]
+
+result = 20*np.log10(result)          # scale to db
+result = np.clip(result, -40, 200)    # clip values
+
+
 
 # // *---------------------------------------------------------------------* //
 
