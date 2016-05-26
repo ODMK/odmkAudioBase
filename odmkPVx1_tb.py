@@ -184,9 +184,9 @@ def odmkPVA(PVAin, Awin, NFFT, Ra, Fs):
     for k in range(sigZpLength):
         PVAin = np.append(PVAin, 0)
 
-    sigLength = len(PVAin)
-    print('Zero padded signal length = '+str(sigLength))        
-    numFrame = int((sigLength - (sigLength % Ra))/Ra)
+    newLength = len(PVAin)
+    print('Zero padded signal length = '+str(newLength))        
+    numFrame = int((newLength - (newLength % Ra))/Ra)
     print('Number of STFT output frames = '+str(numFrame)+'\n')
 
     # int posin, posout, i, k, mod;
@@ -197,7 +197,7 @@ def odmkPVA(PVAin, Awin, NFFT, Ra, Fs):
     sigframe = np.zeros(NFFT)
     # fft output spectrum (complex)
     specframe = np.zeros(NFFT)
-
+    # array to hold phases from previous frame
     lastph = np.zeros(NFFT/2)
 
     specframe_mag = np.zeros(NFFT/2)
@@ -208,14 +208,16 @@ def odmkPVA(PVAin, Awin, NFFT, Ra, Fs):
 
     # PVAout = np.arange(2*NFFT/2*numFrame).reshape(2, NFFT/2, numFrame)
     PVAout = np.zeros((2,numFrame,NFFT/2))
-    
+
+    print('generating output PVAout, with dimensions: '+str(PVAout.shape)+'\n')
+
     frameIdx = 0
     # for(posin=posout=0; posin < input_size; posin+=hopsize):
-    for j in range(0, sigLength, Ra):
+    for j in range(0, newLength, Ra):
         mod = j % NFFT
         # window & rotate a signal frame
         for i in range(NFFT):
-            if (j+i < sigLength):
+            if (j+i < newLength):
                 sigframe[(i + mod) % NFFT] = PVAin[j + i] * Awin[i]
             else:
                 sigframe[(i + mod) % NFFT] = 0
@@ -253,60 +255,66 @@ def odmkPVA(PVAin, Awin, NFFT, Ra, Fs):
         # PVAout[1][frameIdx] = specframe_ph
         frameIdx += 1
 
-    return PVAout
+    return PVAout, sigLength
 
 
+def odmkPVS(PVSin, Slength, Swin, NFFT, Rs, Fs):
+    ''' odmk phase vocoder Synthesis
+        PVSin -> PV formatted input data << np.array[2, numFrames, NFFT/2] >>
+        Slength -> length of final output signal (matches original source)
+        Swin -> phase vocoder synthesis window
+        PVSout -> phase vocoder re-synthesized signal <time-domain>
+        NFFT -> fft length
+        Rs -> Synthesis sample hop
+        fs -> sampling frequency '''
+    
+    # internal specframe length
+    Ilength = len(PVSin[0,0,:])
 
+    # input signal (real-only)
+    sigframe = np.zeros(NFFT)
+    # fft output spectrum (complex)
+    specframe = np.zeros(NFFT, dtype=complex)
+    # array to hold phases from previous frame
+    lastph = np.zeros(NFFT/2)
 
-#int pvs(float* input, float* window, float* output,
-#          int input_size, int fftsize, int hopsize, float sr){
-#
-#int posin, posout, k, i, output_size, mod;
-#float *sigframe, *specframe, *lastph;
-#float fac, scal, phi, mag, delta;
-#
-#sigframe = new float[fftsize];
-#specframe = new float[fftsize];
-#lastph = new float[fftsize/2];
-#memset(lastph, 0, sizeof(float)*fftsize/2);
-#
-#output_size = input_size*hopsize/fftsize;
-#
-#fac = (float) (hopsize*twopi/sr);
-#scal = sr/fftsize;
-#
-#for(posout=posin=0; posout < output_size; posout+=hopsize){ 
-#
-#   // load in a spectral frame from input 
-#   for(i=0; i < fftsize; i++, posin++)
-#        specframe[i] = input[posin];
-#	
-# // convert from PV input to DFT coordinates
-# for(i=2,k=1; i < fftsize; i+=2, k++){
-#   delta = (specframe[i+1] - k*scal)*fac;
-#   phi = lastph[k]+delta;
-#   lastph[k] = phi;
-#   mag = specframe[i];
-#  
-#  specframe[i] = (float) (mag*cos(phi));
-#  specframe[i+1] = (float) (mag*sin(phi)); 
-#  
-#}
-#   // inverse-transform it
-#   ifft(specframe, sigframe, fftsize);
-#
-#   // unrotate and window it and overlap-add it
-#   mod = posout%fftsize;
-#   for(i=0; i < fftsize; i++)
-#       if(posout+i < output_size)
-#          output[posout+i] += sigframe[(i+mod)%fftsize]*window[i];
-#}
-#delete[] sigframe;
-#delete[] specframe;
-#delete[] lastph;
-#
-#return output_size;
-#}
+        specframe_mag = np.zeros(NFFT/2)
+    specframe_ph = np.zeros(NFFT/2)
+
+    fac = Rs * 2*np.pi
+    scal = Fs / NFFT, ILength, Rs):
+
+        # load in a spectral frame from input
+        specframe_mag
+    
+    frameIdx = 0
+    # for(posin=posout=0; posin < input_size; posin+=hopsize):
+    for j in range(0 = PVSin[0, frameIdx, :]
+        specframe_ph = PVSin[1, frameIdx, :]
+    	
+        # convert from PV input to DFT coordinates
+         
+        for k in range(1, int(NFFT/2)):
+        
+            delta = (specframe_ph[k] - k * scal) * fac
+            phi = lastph[k]+delta
+            lastph[k] = phi
+            mag = specframe_mag[k]
+
+            cmplxReal = mag * np.cos(phi)
+            cmplxImag = mag * np.sin(phi)
+            specframe[k] = np.complex(cmplxReal, cmplxImag)
+
+        # inverse-transform it
+        sigframe = sp.ifft(specframe)
+    
+        # unrotate and window it and overlap-add it
+        mod = j % NFFT
+        for i in range(NFFT):
+            if j + i < ILength:
+                PVSout[j + i] += sigframe[(i + mod) % NFFT] * Swin[i]
+
+    return PVSout
 
 
 #int pva(float *input, float *window, float *output, 
@@ -367,7 +375,8 @@ def odmkPVA(PVAin, Awin, NFFT, Ra, Fs):
 #
 #return posout;
 #}
-#
+
+
 #int pvs(float* input, float* window, float* output,
 #          int input_size, int fftsize, int hopsize, float sr){
 #
@@ -552,22 +561,22 @@ print('// *--------------------------------------------------------------* //')
 print('// *---::Check source waveform spectrum::---*')
 print('// *--------------------------------------------------------------* //')
 
-# FFT length
+# FFT length for source waveform spectral analysis (tb, unrelated to PV)
 N = 2048
 
 # // *---------------------------------------------------------------------* //
 
-y1 = sin2_5K[0:N]
-y2 = sin5K[0:N]
+y1 = sin2_5K[0:10000]
+y2 = sin5K[0:10000]
 
 # forward FFT
-y1_FFT = sp.fft(y1)
+y1_FFT = sp.fft(y1[0:N])
 y1_Mag = np.abs(y1_FFT)
 y1_Phase = np.arctan2(y1_FFT.imag, y1_FFT.real)
 # scale and format FFT out for plotting
 y1_FFTscale = 2.0/N * np.abs(y1_FFT[0:N/2])
 
-y2_FFT = sp.fft(y2)
+y2_FFT = sp.fft(y2[0:N])
 y2_Mag = np.abs(y2_FFT)
 y2_Phase = np.arctan2(y2_FFT.imag, y2_FFT.real)
 # scale and format FFT out for plotting
@@ -579,7 +588,7 @@ y1_IFFT = sp.ifft(y1_FFT)
 y2_IFFT = sp.ifft(y2_FFT)
 
 # check
-yDiff = y2_IFFT - y2
+yDiff = y2_IFFT - y2[0:N]
 
 # // *---------------------------------------------------------------------* //
 
@@ -646,6 +655,9 @@ PVAin = y2[0:sigLength]
 
 Awin = np.blackman(NFFT)
 
+print('\nodmkPVA function call using the following parameters:')
+print('PV NFFT = '+str(NFFT))
+print('PV Analysis Hop = '+str(Ra)+' (samples)\n')
 
 PVAout = odmkPVA(PVAin, Awin, NFFT, Ra, fs)
 
@@ -687,52 +699,6 @@ pltYlabel = 'Magnitude (scaled by 2/N)'
 xfnyq = np.linspace(0.0, 1.0/(2.0*T), N/2)
 
 odmkPlot1D(fnum, y1_FFTscale, xfnyq, pltTitle, pltXlabel, pltYlabel)
-
-
-# // *---------------------------------------------------------------------* //
-# // *---plot a single sin out of array---*
-# // *---------------------------------------------------------------------* //
-
-#nn = 0
-#
-## FFT length
-#N = 2048
-#
-#sinAtst = sinArray[0:N, nn]
-#sinAtst_frq = testFreqs[nn]
-#
-## forward FFT
-#sinAtst_FFT = sp.fft(sinAtst)
-#sinAtst_Mag = np.abs(sinAtst_FFT)
-#sinAtst_Phase = np.arctan2(sinAtst_FFT.imag, sinAtst_FFT.real)
-## scale and format FFT out for plotting
-#sinAtst_FFTscale = 2.0/N * np.abs(sinAtst_FFT[0:N/2])
-#
-## inverse FFT
-#sinAtst_IFFT = sp.ifft(sinAtst_FFT)
-#
-#fnum = 300
-#pltTitle = 'Input Signal sinAtst (first '+str(tLen)+' samples)'
-#pltXlabel = 'sinAtst: '+str(sinAtst_frq)+' Hz'
-#pltYlabel = 'Magnitude'
-#
-#sig = sinAtst[0:tLen]
-#
-## define a linear space from 0 to 1/2 Fs for x-axis:
-#xaxis = np.linspace(0, tLen, tLen)
-#
-#odmkPlot1D(fnum, sig, xaxis, pltTitle, pltXlabel, pltYlabel)
-#
-#
-#fnum = 301
-#pltTitle = 'Scipy FFT Mag: sinAtst '+str(sinAtst_frq)+' Hz'
-#pltXlabel = 'Frequency: 0 - '+str(fs / 2)+' Hz'
-#pltYlabel = 'Magnitude (scaled by 2/N)'
-#
-## define a linear space from 0 to 1/2 Fs for x-axis:
-#xfnyq = np.linspace(0.0, 1.0/(2.0*T), N/2)
-#
-#odmkPlot1D(fnum, sinAtst_FFTscale, xfnyq, pltTitle, pltXlabel, pltYlabel)
 
 
 # // *---------------------------------------------------------------------* //
@@ -788,6 +754,42 @@ odmkMultiPlot1D(fnum, yOrthoScaleArray, xfnyq, pltTitle, pltXlabel, pltYlabel, c
 
 
 # // *---------------------------------------------------------------------* //
+# // *---STFT Analysis Window - COLA test---*
+# // *---------------------------------------------------------------------* //
+
+colaNum = 4
+colaLength = colaNum*Ra + (len(Awin) - Ra)
+
+pvAwinShft = np.array([])
+pvAwinSum = np.array([])
+pvAwinCOLA = np.array([])
+
+for z in range(0, colaNum*Ra, Ra):
+    if z == 0:
+        pvAwinShft = np.append(Awin, np.zeros(colaLength - len(Awin)))
+        pvAwinSum = pvAwinShft
+    else:
+        pvAwinShft = np.append(np.zeros(z), Awin)
+        pvAwinShft = np.append(pvAwinShft, np.zeros(colaLength - (z + len(Awin))))
+        pvAwinSum = pvAwinSum + pvAwinShft
+    pvAwinCOLA = np.concatenate((pvAwinCOLA, pvAwinShft))
+
+pvAwinCOLA = np.concatenate((pvAwinCOLA, pvAwinSum))
+pvAwinCOLA = pvAwinCOLA.reshape((colaNum + 1, colaLength))
+pvAwinCOLA = pvAwinCOLA.transpose()
+
+fnum = 200
+pltTitle = 'PV Analysis window Cola test:'
+pltXlabel = 'time'
+pltYlabel = 'Amplitude'
+
+# define a linear space from 0 to 1/2 Fs for x-axis:
+xaxis = np.linspace(0, colaLength, colaLength)
+
+odmkMultiPlot1D(fnum, pvAwinCOLA, xaxis, pltTitle, pltXlabel, pltYlabel, colorMp='hsv')
+
+
+# // *---------------------------------------------------------------------* //
 # // *---STFT Magnitude plot (1 frame)---*
 # // *---------------------------------------------------------------------* //
 
@@ -801,7 +803,31 @@ pltYlabel = 'Magnitude (scaled by 2/N)'
 # define a linear space from 0 to 1/2 Fs for x-axis:
 xfnyq = np.linspace(0.0, 1.0/(2.0*T), NFFT/2)
 
-odmkPlot1D(fnum, PVAout[0][0], xfnyq, pltTitle, pltXlabel, pltYlabel)
+odmkPlot1D(fnum, PVAout[0, 11, :], xfnyq, pltTitle, pltXlabel, pltYlabel)
+
+# // *---------------------------------------------------------------------* //
+# // *---STFT Magnitude plot (All frame)---*
+# // *---------------------------------------------------------------------* //
+
+pvWaterfall = np.array([])
+
+for j in range(len(PVAout[0,:,0])):
+     pvWaterfall = np.concatenate((pvWaterfall, PVAout[0, j, :]))
+pvWaterfall = pvWaterfall.reshape((len(PVAout[0,:,0]), len(PVAout[0,0,:])))     
+pvWaterfall = pvWaterfall.transpose()
+     
+fnum = 101
+pltTitle = 'Scipy PV Mag: PVAout (All frame) '+str(testFreq2)+' Hz'
+pltXlabel = 'Frequency: 0 - '+str(fs / 2)+' Hz'
+pltYlabel = 'Magnitude (scaled by 2/N)'
+
+# sig <= direct
+
+# define a linear space from 0 to 1/2 Fs for x-axis:
+xfnyq = np.linspace(0.0, 1.0/(2.0*T), NFFT/2)
+
+odmkMultiPlot1D(fnum, pvWaterfall, xfnyq, pltTitle, pltXlabel, pltYlabel, colorMp='Spectral')
+
 
 
 # // *---------------------------------------------------------------------* //
