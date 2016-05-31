@@ -165,22 +165,21 @@ def odmkMultiPlot1D(fnum, sigArray, xLin, pltTitle, pltXlabel, pltYlabel, colorM
 # // *--Phase Vocoder Functions--*
 # // *---------------------------------------------------------------------* //
 
-def odmkPVA(PVAin, Awin, NFFT, Ra, Fs):
+def odmkPVA(PVAin, SLength, Awin, NFFT, Ra, Fs):
     ''' odmk phase vocoder Analysis
         PVAin -> wave file / signal source in
         Awin -> phase vocoder analysis window (default = cos)
         PVAout -> phase vocoder output array <rows = bins, cols = frames>
         NFFT -> fft length
         Ra -> Analysis sample hop
-        fs -> sampling frequency '''
-
-    sigLength = len(PVAin)
-    print('\noriginal input signal length = '+str(sigLength))
+        fs -> sampling frequency '''    
+    
+    print('\noriginal input signal length = '+str(SLength))
     # calculate zero-padded internal result buffer
-    if sigLength % Ra == 0:
+    if SLength % Ra == 0:
         sigZpLength = 0
     else:
-        sigZpLength = Ra - (sigLength % Ra)    
+        sigZpLength = Ra - (SLength % Ra)    
     for k in range(sigZpLength):
         PVAin = np.append(PVAin, 0)
 
@@ -255,10 +254,10 @@ def odmkPVA(PVAin, Awin, NFFT, Ra, Fs):
         # PVAout[1][frameIdx] = specframe_ph
         frameIdx += 1
 
-    return PVAout, sigLength
+    return PVAout
 
 
-def odmkPVS(PVSin, Slength, Swin, NFFT, Rs, Fs):
+def odmkPVS(PVSin, SLength, Swin, NFFT, Rs, Fs):
     ''' odmk phase vocoder Synthesis
         PVSin -> PV formatted input data << np.array[2, numFrames, NFFT/2] >>
         Slength -> length of final output signal (matches original source)
@@ -267,9 +266,9 @@ def odmkPVS(PVSin, Slength, Swin, NFFT, Rs, Fs):
         NFFT -> fft length
         Rs -> Synthesis sample hop
         fs -> sampling frequency '''
-    
+
     # internal specframe length
-    Ilength = len(PVSin[0,0,:])
+    ILength = len(PVSin[0, 0, :])
 
     # input signal (real-only)
     sigframe = np.zeros(NFFT)
@@ -278,41 +277,48 @@ def odmkPVS(PVSin, Slength, Swin, NFFT, Rs, Fs):
     # array to hold phases from previous frame
     lastph = np.zeros(NFFT/2)
 
-        specframe_mag = np.zeros(NFFT/2)
+    specframe_mag = np.zeros(NFFT/2)
     specframe_ph = np.zeros(NFFT/2)
 
     fac = Rs * 2*np.pi
-    scal = Fs / NFFT, ILength, Rs):
-
-        # load in a spectral frame from input
-        specframe_mag
+    scal = Fs / NFFT
     
+    PVSout = np.zeros((SLength))    # real only out
+
     frameIdx = 0
     # for(posin=posout=0; posin < input_size; posin+=hopsize):
-    for j in range(0 = PVSin[0, frameIdx, :]
+    for j in range(0, ILength, Rs):
+        # load in a spectral frame from input
+        specframe_mag = PVSin[0, frameIdx, :]
         specframe_ph = PVSin[1, frameIdx, :]
-    	
+
         # convert from PV input to DFT coordinates
-         
+
+        specframe[0] = specframe_mag[0]
+        specframe[NFFT/2] = specframe_ph[0]
         for k in range(1, int(NFFT/2)):
-        
+
             delta = (specframe_ph[k] - k * scal) * fac
-            phi = lastph[k]+delta
+            phi = lastph[k] + delta
             lastph[k] = phi
             mag = specframe_mag[k]
-
+            # polar-to-rectangular conversion (positive freqs)
             cmplxReal = mag * np.cos(phi)
             cmplxImag = mag * np.sin(phi)
             specframe[k] = np.complex(cmplxReal, cmplxImag)
+            # re-construct negative frequencies
+            specframe[NFFT-k] = np.complex(cmplxReal, -cmplxImag)
 
         # inverse-transform it
         sigframe = sp.ifft(specframe)
-    
+
+        # pdb.set_trace()
+
         # unrotate and window it and overlap-add it
         mod = j % NFFT
         for i in range(NFFT):
-            if j + i < ILength:
-                PVSout[j + i] += sigframe[(i + mod) % NFFT] * Swin[i]
+            if j + i < SLength:
+                PVSout[j + i] += sigframe[(i + mod) % NFFT].real * Swin[i]
 
     return PVSout
 
@@ -642,7 +648,7 @@ yOrthoScaleArray = yOrthoScaleArray.transpose()
 
 print('\n')
 print('// *--------------------------------------------------------------* //')
-print('// *---::Phase Vocoder Begin::---*')
+print('// *---::Main - Phase Vocoder Begin::---*')
 print('// *--------------------------------------------------------------* //')
 
 sigLength = 4096
@@ -650,18 +656,20 @@ sigLength = 4096
 NFFT = 64
 
 Ra = int(NFFT/4)
+Rs = int(NFFT/4)
 
 PVAin = y2[0:sigLength]
 
 Awin = np.blackman(NFFT)
+Swin = np.blackman(NFFT)
 
 print('\nodmkPVA function call using the following parameters:')
 print('PV NFFT = '+str(NFFT))
 print('PV Analysis Hop = '+str(Ra)+' (samples)\n')
 
-PVAout = odmkPVA(PVAin, Awin, NFFT, Ra, fs)
+PVAout = odmkPVA(PVAin, sigLength, Awin, NFFT, Ra, fs)
 
-
+PVSout = odmkPVS(PVAout, sigLength, Swin, NFFT, Rs, fs)
 
 
 
