@@ -15,7 +15,6 @@
 # \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 # *****************************************************************************
 
-import os
 import random
 import numpy as np
 # import scipy as sp
@@ -38,8 +37,7 @@ def cyclicZn(n):
     cZn = np.zeros((n, 1))*(0+0j)    # column vector of zero complex values
     for k in range(n):
         # z(k) = e^(((k)*2*pi*1j)/n)                         # Define cyclic group Zn points
-        cZn[k] = cos(((k)*2*pi)/n) + sin(((k)*2*pi)/n)*1j    # Euler's identity
-
+        cZn[k] = np.cos(((k)*2*np.pi)/n) + np.sin(((k)*2*np.pi)/n)*1j    # Euler's identity
     return cZn
 
 
@@ -162,12 +160,13 @@ class odmkClocks:
             else:
                 xQtrBeat[i] = 0
         return xQtrBeat
+        
 
     # // *-----------------------------------------------------------------* //
     # // *---gen note sequence (nBar # of bars)
     # // *-----------------------------------------------------------------* //
 
-    def clkQtrBar(self, nBar=1):
+    def clkQtrBeatBar(self, nBar=1):
         ''' Output a 1 at Qtr downbeat for 'nBar' bars (4/4, 4 qtr notes)
             optional nBar parameter: default nBar = 1 bar '''
 
@@ -179,6 +178,43 @@ class odmkClocks:
             else:
                 xQtrBar[i] = 0
         return xQtrBar
+
+
+    # // *-----------------------------------------------------------------* //
+    # // *---gen note sequence (xLength samples)
+    # // *-----------------------------------------------------------------* //
+
+#    def clkOne3Beat(self):
+#        ''' Output a 1 - 3 divisions per bar for xLength samples '''
+#
+#        # set samplesPerBeat
+#        # samplesPerBar = self.samplesPerBar    # assume 1Qtr = 1Beat
+#        xDiv3Beat = np.ceil(self.samplesPerBar / 3)
+#
+#
+#        xDiv3 = np.zeros([self.totalSamples, 1])
+#        for i in range(self.totalSamples):
+#            if i % xDiv3 == 0:
+#                xDiv3Beat[i] = 1
+#            else:
+#                xDiv3Beat[i] = 0
+#        return xDiv3Beat
+
+
+    def clkDivNBeat(self, n):
+        ''' Output a pulse every bar/n samples for xLength samples '''
+
+        # set samplesPerBeat
+        # samplesPerBar = self.samplesPerBar    # assume 1Qtr = 1Beat
+        clkDivN = np.ceil(self.samplesPerBar / n)
+
+        clkDivNBeat = np.zeros([self.totalSamples, 1])
+        for i in range(self.totalSamples):
+            if i % clkDivN == 0:
+                clkDivNBeat[i] = 1
+            else:
+                clkDivNBeat[i] = 0
+        return clkDivNBeat
 
 # /////////////////////////////////////////////////////////////////////////////
 # #############################################################################
