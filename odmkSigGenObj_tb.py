@@ -49,6 +49,7 @@ import odmkSigGen1 as sigGen
 #import pdb
 
 # // *---------------------------------------------------------------------* //
+plt.close('all')
 clear_all()
 
 
@@ -103,6 +104,12 @@ print('// *---::Set Master Parameters for output::---*')
 print('// *--------------------------------------------------------------* //')
 
 
+# /////////////////////////////////////////////////////////////////////////////
+# #############################################################################
+# begin : Primary parameters definitions
+# #############################################################################
+# \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+
 # // *---------------------------------------------------------------------* //
 # // *--Primary parameters--*
 # // *---------------------------------------------------------------------* //
@@ -128,6 +135,13 @@ bpm = 133.0
 timeSig = 0
 
 
+# /////////////////////////////////////////////////////////////////////////////
+# #############################################################################
+# begin : object definition
+# #############################################################################
+# \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+
+
 print('\n')
 print('// *--------------------------------------------------------------* //')
 print('// *---::Instantiate clock & signal Generator objects::---*')
@@ -142,6 +156,13 @@ tbSigGen = sigGen.odmkSigGen1(numSamples, fs)
 # // *---------------------------------------------------------------------* //
 
 tbclkDownBeats = tbClocks.clkDownBeats()
+
+
+# /////////////////////////////////////////////////////////////////////////////
+# #############################################################################
+# begin : Generate source waveforms
+# #############################################################################
+# \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
 
 print('\n')
@@ -165,12 +186,27 @@ cos5K = tbSigGen.monocos(testFreq2)
 tri2_5K = tbSigGen.monotri(testFreq1)
 tri5K = tbSigGen.monotri(testFreq2)
 
+odmkTestFreqArray5_1 = [666.0, 777.7, 2300.0, 6000.0, 15600.0]
+odmkTestFreqArray5_2 = [444.0, 1776.0]
+odmkTestFreqArray5_3 = [3200.0, 6400.0, 9600.0, 12800.0, 16000.0, 19200.0,  22400.0]
+multiSinV1 = tbSigGen.multiSin(odmkTestFreqArray5_2)
+
+numOrtFreqs = 7
+nCzn = cyclicZn(2*numOrtFreqs + 1)
+
+nOrthogonalArray = np.array([])
+for c in range(1, numOrtFreqs+1):
+    nCznPh = np.arctan2(nCzn[c].imag, nCzn[c].real)
+    nOrthogonalArray = (fs*nCznPh)/(2*np.pi)
+
+
 # // *---------------------------------------------------------------------* //
 
 print('\n::Multi Sine source::')
 print('generated array of sin signals "sinArray"')
-testFreqs = [666.0, 777.7, 2300.0, 6000.0, 15600.0]
-numFreq = len(testFreqs)
+# testFreqs = [666.0, 777.7, 2300.0, 6000.0, 15600.0]
+testFreqs = odmkTestFreqArray5_1
+numFreqSinArray = len(testFreqs)
 
 print('Frequency Array (Hz):')
 print(testFreqs)
@@ -178,7 +214,7 @@ print(testFreqs)
 sinArray = np.array([])
 for freq in testFreqs:
     sinArray = np.concatenate((sinArray, tbSigGen.monosin(freq)))
-sinArray = sinArray.reshape((numFreq, numSamples))
+sinArray = sinArray.reshape((numFreqSinArray, numSamples))
 
 # // *---------------------------------------------------------------------* //
 
@@ -207,7 +243,31 @@ for freq in orthoFreqArray:
     orthoSinArray = np.concatenate((orthoSinArray, tbSigGen.monosin(freq)))
 orthoSinArray = orthoSinArray.reshape((numOrthoFreq, numSamples))
 
+
 # // *---------------------------------------------------------------------* //
+
+# generate a composite signal of an array of frequencies
+
+print('\n::Orthogonal Composite Multi Sine source::')
+print('generated a Composite array of sin signals "orthoSinComp1"')
+
+# for n freqs, use 2n+1 => skip DC and negative freqs!
+# ex. for cyclicZn(15), we want to use czn[1, 2, 3, ... 7]
+
+compFreqArray = odmkTestFreqArray5_3
+
+sinComp1 = tbSigGen.multiSin(compFreqArray)
+
+print('Generated composite sine signal: sinComp1')
+
+
+# // *---------------------------------------------------------------------* //
+
+# /////////////////////////////////////////////////////////////////////////////
+# #############################################################################
+# begin : FFT processing
+# #############################################################################
+# \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
 print('\n')
 print('// *--------------------------------------------------------------* //')
@@ -256,21 +316,47 @@ y3tri_FFTscale = 2.0/N * np.abs(y3tri_FFT[0:int(N/2)])
 
 # // *---------------------------------------------------------------------* //
 
+## ::sinArray Probes::
+#ttLen = 200
+#sig = sinArray[3, 0:ttLen]
+## define a linear space from 0 to 1/2 Fs for x-axis:
+#xaxis = np.linspace(0, ttLen, ttLen)
+#
+#fnum = 300
+#pltTitle = 'SigGen output: sinArray[0] (first '+str(ttLen)+' samples)'
+#pltXlabel = 'time'
+#pltYlabel = 'Magnitude (scaled by ???)'
+#
+#odmkplt.odmkPlot1D(fnum, sig, xaxis, pltTitle, pltXlabel, pltYlabel)
+#
+#
+#yProbeArray1 = sp.fft(sinArray[3, 0:N])
+#yProbeScale1 = 2.0/N * np.abs(yProbeArray1[0:int(N/2)])
+## define a linear space from 0 to 1/2 Fs for x-axis:
+#xfnyq = np.linspace(0.0, 1.0/(2.0*T), N/2)
+#
+#fnum = 301
+#pltTitle = 'FFT Mag: y3tri_FFTscale '+str(testFreq1)+' Hz'
+#pltXlabel = 'Frequency: 0 - '+str(fs / 2)+' Hz'
+#pltYlabel = 'Magnitude (scaled by 2/N)'
+#
+#odmkplt.odmkPlot1D(fnum, yProbeScale1, xfnyq, pltTitle, pltXlabel, pltYlabel)
+
+
 # ::sinArray::
+numFreqs = numFreqSinArray    # defined above for gen of sinArray
 
 yArray = np.array([])
 yMagArray = np.array([])
 yPhaseArray = np.array([])
 yScaleArray = np.array([])
 # for h in range(len(sinArray[0, :])):
-for h in range(numFreq):    
+for h in range(numFreqs):    
     yFFT = sp.fft(sinArray[h, 0:N])
     yArray = np.concatenate((yArray, yFFT))
     yScaleArray = np.concatenate((yScaleArray, 2.0/N * np.abs(yFFT[0:int(N/2)])))
-
-yArray = yArray.reshape((numFreq, N))
-
-yScaleArray = yScaleArray.reshape((numFreq, int(N/2)))
+yArray = yArray.reshape((numFreqs, N))
+yScaleArray = yScaleArray.reshape((numFreqs, int(N/2)))
 
 # yMagArray = yMagArray.reshape((numFreqs, N))
 # yMagArray = yMagArray.transpose()
@@ -281,31 +367,54 @@ yScaleArray = yScaleArray.reshape((numFreq, int(N/2)))
 # // *---------------------------------------------------------------------* //
 
 # ::orthoSinArray::
+numFreqs = numOrthoFreq
 
 yOrthoArray = np.array([])
 yOrthoMagArray = np.array([])
 yOrthoPhaseArray = np.array([])
 yOrthoScaleArray = np.array([])
 # for h in range(len(sinArray[0, :])):
-for h in range(numOrthoFreq):
+for h in range(numFreqs):
     yOrthoFFT = sp.fft(orthoSinArray[h, 0:N])
     yOrthoArray = np.concatenate((yOrthoArray, yOrthoFFT))
     yOrthoScaleArray = np.concatenate((yOrthoScaleArray, 2.0/N * np.abs(yOrthoFFT[0:int(N/2)])))
-
-yOrthoArray = yOrthoArray.reshape((numOrthoFreq, N))
-
-yOrthoScaleArray = yOrthoScaleArray.reshape(numOrthoFreq, (int(N/2)))
+yOrthoArray = yOrthoArray.reshape((numFreqs, N))
+yOrthoScaleArray = yOrthoScaleArray.reshape(numFreqs, (int(N/2)))
 
 
 # // *---------------------------------------------------------------------* //
 
+# ::compositeSinOut1::
+ySinComp1 = sinComp1[0:N]
+
+# forward FFT
+sinComp1_FFT = sp.fft(ySinComp1)
+sinComp1_Mag = np.abs(sinComp1_FFT)
+sinComp1_Phase = np.arctan2(sinComp1_FFT.imag, sinComp1_FFT.real)
+# scale and format FFT out for plotting
+sinComp1_FFTscale = 2.0/N * np.abs(sinComp1_FFT[0:int(N/2)])
+
+# inverse FFT
+sinComp1_IFFT = sp.ifft(sinComp1_FFT)
+
+
 # // *---------------------------------------------------------------------* //
+
+# /////////////////////////////////////////////////////////////////////////////
+# #############################################################################
+# begin : Plotting
+# #############################################################################
+# \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+
+# // *---------------------------------------------------------------------* 
 
 print('\n')
 print('// *--------------------------------------------------------------* //')
 print('// *---::Plotting::---*')
 print('// *--------------------------------------------------------------* //')
 
+
+# // *---------------------------------------------------------------------* //
 
 odmkPlots = 0
 if odmkPlots == 1:
@@ -428,16 +537,65 @@ if odmkPlots == 1:
     
     odmkplt.odmkPlot1D(fnum, y3tri_FFTscale, xfnyq, pltTitle, pltXlabel, pltYlabel)    
 
+
+    # // *---------------------------------------------------------------------* //
+    # // *---Composite Sine Plot - source signal array vs. FFT MAG out array---*
+    # // *---------------------------------------------------------------------* //
+
+   # // *-----------------------------------------------------------------* //
+
+
+    # odmkTestFreqArray5_3
+    tLen = 200
+    
+    sig = sinComp1[0:tLen]
+    # define a linear space from 0 to 1/2 Fs for x-axis:
+    xaxis = np.linspace(0, tLen, tLen)
+    
+
+    fnum = 9
+    pltTitle = 'SigGen output: sinComp1 Composite waveform (first '+str(tLen)+' samples)'
+    pltXlabel = 'time'
+    pltYlabel = 'Magnitude (scaled by ???)'
+    
+    odmkplt.odmkPlot1D(fnum, sig, xaxis, pltTitle, pltXlabel, pltYlabel)    
+
+    # // *-----------------------------------------------------------------* //
+
+    fnum = 10
+    pltTitle = 'FFT Mag: sinComp1_FFTscale Composite waveform'
+    pltXlabel = 'Frequency: 0 - '+str(fs / 2)+' Hz'
+    pltYlabel = 'Magnitude (scaled by 2/N)'
+    
+    # sig <= direct
+    
+    # define a linear space from 0 to 1/2 Fs for x-axis:
+    xfnyq = np.linspace(0.0, 1.0/(2.0*T), N/2)
+    
+    odmkplt.odmkPlot1D(fnum, sinComp1_FFTscale, xfnyq, pltTitle, pltXlabel, pltYlabel)    
+
     # // *-----------------------------------------------------------------* //
 
 
-else:    # comment-off/on: toggle plots below  
-    print('\n')
-    print('// *---::No Plotting / Debugging::---*')
+
 
     plt.show()
 
+else:    # comment-off/on: toggle plots below  
+    print('\n')
+    print('// *---::Plotting Bypassed::---*')
+
+
 # // *---------------------------------------------------------------------* //
+
+# /////////////////////////////////////////////////////////////////////////////
+# #############################################################################
+# begin : Write Signal to .txt File
+# #############################################################################
+# \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+
+# // *---------------------------------------------------------------------* //
+
 
 odmkTxtFileOut = 1
 if odmkTxtFileOut == 1:
@@ -460,6 +618,15 @@ if odmkTxtFileOut == 1:
     tbSigGen.sig2txt(sigIn, nChan, outNmTXT, outDir=outputDir)
     print('\nwrote data to file: '+outputDir+outNmTXT)
 
+    # // *-----------------------------------------------    
+    # write a 1D sine signal to .txt
+    sigIn = sinComp1
+    
+    outNmTXT = 'sinComp1.txt'
+    nChan = 1
+    
+    tbSigGen.sig2txt(sigIn, nChan, outNmTXT, outDir=outputDir)
+    print('\nwrote data to file: '+outputDir+outNmTXT)
 
     # // *-----------------------------------------------    
     # write multi-array of 1D sine signals to .txt

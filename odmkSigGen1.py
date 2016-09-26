@@ -57,32 +57,7 @@ print('// \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\ //')
 #x = np.linspace(0.0, N*T, N)
 #y = np.sin(freqs[0] * 2.0*np.pi*x) + 0.5*np.sin(freqs[1] * 2.0*np.pi*x)
 
-
 # // *---------------------------------------------------------------------* //
-
-#print('\n')
-#print('// *--------------------------------------------------------------* //')
-#print('// *---::Load CSV data into "dataout" (numpy array, floats)::---*')
-#print('// *--------------------------------------------------------------* //')
-#
-#rootDir = u'C:/usr/eschei/odmkPython/odmk/audio/'
-#outDir = rootDir+'csvgen/'
-#os.makedirs(outDir, exist_ok=True)
-#
-#sigOut = 'sigOutTest1.csv'
-#sigOutFull = outDir+sigOut
-#
-## writes data to .CSV file:
-#
-#outputFile = open(sigOutFull, 'w', newline='')
-#outputWriter = csv.writer(outputFile)
-#
-#for i in range(N):
-#    tmpRow = [y[i]]
-#    outputWriter.writerow(tmpRow)
-#
-#
-#outputFile.close()
 
 # /////////////////////////////////////////////////////////////////////////////
 # #############################################################################
@@ -121,6 +96,10 @@ class odmkSigGen1:
         self.fs = fs
         print('\nAn odmkSigGen1 object has been instanced with:')
         print('sigLength = '+str(self.sigLength)+'; fs = '+str(fs))
+
+    # #########################################################################
+    # begin : object definition
+    # #########################################################################
 
     # // *-----------------------------------------------------------------* //
     # // *---gen simple periodic sin waveforms (sigLength # samples)
@@ -212,6 +191,41 @@ class odmkSigGen1:
         return monotri
 
 
+    def multiSin(self, freqArray, fs='None'):
+        ''' generates an array of sin waves with frequency = "freq"
+            optional fs parameter: default = obj global fs
+            usage:
+            >>tbSigGen = sigGen.odmkSigGen1(numSamples, fs)
+            >>testFreqArray = 5000.0
+            >>sin5K = tbSigGen.monosin(testFreq2) '''
+
+        if len(freqArray) <= 1:
+            print('ERROR (multiSin): freq must be a list of frequencies')
+            return 1
+
+        if fs != 'None':
+            Fs = fs
+        else:
+            Fs = self.fs
+
+        # sample period
+        T = 1.0 / Fs
+
+        # create composite sin source
+        x = np.linspace(0.0, self.sigLength*T, self.sigLength)
+        multiSin = np.zeros([self.sigLength])
+        for i in range(len(freqArray)):
+            for j in range(self.sigLength):
+                curr = multiSin[j]
+                multiSin[j] = curr + np.sin(freqArray[i] * 2.0*np.pi * x[j])
+        multiSin = (0.999 / max(multiSin)) * multiSin
+        return multiSin
+
+
+    # #########################################################################
+    # begin : file output
+    # #########################################################################
+
     # // *-----------------------------------------------------------------* //
     # // *---TXT write simple periodic waveforms (sigLength # samples)
     # // *-----------------------------------------------------------------* //
@@ -289,7 +303,13 @@ class odmkSigGen1:
             outputWriter.writerow(tmpRow)
 
         outputFile.close()        
-        
+
+
+
+
+
+
+
 #case 3 then  // store 1 cycle of saw-up
 #        table1=[(-0.999:.999/(depth/2-1):.999)'];
 #case 4 then  // store 1 cycle of saw-down
